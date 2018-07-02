@@ -34,14 +34,37 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <ctype.h>
 #include <mach/mach_types.h>
 #include <mach/vm_map.h>
 #include <mach/mach_host.h>
 #include <mach/mach.h>
 #include <sys/sysctl.h>
 #include <sys/types.h>
+#include <sys/proc.h>
 
 int v; // verbose mode flag
+
+uint32_t get_pid_of_proc(const char *process_name)
+{
+    uint32_t pid = 0;
+    char buffer[256];
+    int buffer_size = 256;
+    uint32_t pid_of_proc;
+
+    // 99999 is the value of PID_MAX in bsd/sys/proc_internal.h
+    for (pid = 0; pid < 99999; pid++)
+    {
+        buffer[0] = 0;
+        proc_name(pid, buffer, buffer_size);
+        if (strlen(buffer) > 0)
+        {
+            if (!strcmp(process_name, buffer))
+                pid_of_proc = pid;
+        }
+    }
+    return pid_of_proc;
+}
 
 void registers(mach_port_t port){
 
@@ -229,6 +252,9 @@ void check_root(){
 int main(int argc, char *argv[]){
 
     v = 0;
+    int pid;
+    char process[128];
+
     if (argc >= 2){
         if (strcmp(argv[1],"-v")==0){
             // verbose mode enabled
@@ -240,11 +266,17 @@ int main(int argc, char *argv[]){
     printf("\n\033[1mLyla Debugger for \x1b[32mARM\x1b[0m\033[1m\nVersion:1.0\nDeveloped by @bellis1000\n\n\x1b[0m");
     check_root();
 
-    printf("Enter PID to attach to >> ");
-    int pid;
-    scanf("%d",&pid);
+    printf("Enter process to attach to >> ");
+    scanf("%s", process);
     printf("\x1b[0m");
-    
+
+    // check if value is the pid or process name
+    if (!isdigit(process[0])){
+        pid = (int)get_pid_of_proc(process);
+    } else {
+        pid = atoi(process);
+    }
+
     if (pid == 0){
         printf("Lyla does not currently support kernel debugging.\n");
         exit(0);
